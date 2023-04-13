@@ -149,8 +149,13 @@ const Room = () => {
 
   return (
     <div>
-      <video autoPlay ref={userVideo} muted={true} />
-      <video autoPlay ref={partnerVideo} />
+      <video
+        autoPlay
+        ref={userVideo}
+        muted={true}
+        style={{ border: "5px solid red" }}
+      />
+      <video autoPlay ref={partnerVideo} style={{ border: "5px solid blue" }} />
     </div>
   );
 };
