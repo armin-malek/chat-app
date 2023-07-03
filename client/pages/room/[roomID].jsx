@@ -1,7 +1,7 @@
-import CreateRoom from "@/components/CreateRoom";
 import React, { useRef, useEffect, useState } from "react";
 import io from "socket.io-client";
 import { useRouter } from "next/router";
+import { v4 as uuid } from "uuid";
 
 const Room = () => {
   const userVideo = useRef();
@@ -23,6 +23,7 @@ const Room = () => {
   }, [roomID]);
 */
   useEffect(() => {
+    if (!roomID) return;
     navigator.mediaDevices
       .getUserMedia({ audio: true, video: true })
       .then((stream) => {
@@ -30,15 +31,21 @@ const Room = () => {
         userStream.current = stream;
 
         socketRef.current = io.connect("http://localhost:8000");
-        socketRef.current.emit("join room", roomID);
+
+        const uniqueID = getUniqueID();
+        // console.log("join room", roomID);
+        socketRef.current.emit("join room", { roomID, uniqueID });
 
         socketRef.current.on("other user", (userID) => {
-          callUser(userID);
-          otherUser.current = userID;
+          console.log("other", userID);
+          callUser(userID.sid);
+          otherUser.current = userID.sid;
         });
 
         socketRef.current.on("user joined", (userID) => {
-          otherUser.current = userID;
+          console.log("other join", userID);
+
+          otherUser.current = userID.sid;
         });
 
         socketRef.current.on("offer", handleRecieveCall);
@@ -47,9 +54,11 @@ const Room = () => {
 
         socketRef.current.on("ice-candidate", handleNewICECandidateMsg);
       });
-  }, []);
+  }, [roomID]);
 
   function callUser(userID) {
+    console.log("callUser", userID);
+
     peerRef.current = createPeer(userID);
     userStream.current
       .getTracks()
@@ -57,16 +66,19 @@ const Room = () => {
   }
 
   function createPeer(userID) {
+    console.log("createPeer", userID);
     const peer = new RTCPeerConnection({
       iceServers: [
         {
           urls: "stun:stun.stunprotocol.org",
+          // urls: "stun:localhost:3478",
+          // urls: "stun:stun.frozenmountain.com:3478",
         },
-        {
-          urls: "turn:numb.viagenie.ca",
-          credential: "muazkh",
-          username: "webrtc@live.com",
-        },
+        // {
+        //   urls: "turn:numb.viagenie.ca",
+        //   credential: "muazkh",
+        //   username: "webrtc@live.com",
+        // },
       ],
     });
 
@@ -78,6 +90,7 @@ const Room = () => {
   }
 
   function handleNegotiationNeededEvent(userID) {
+    console.log("handleNegotiationNeededEvent", userID);
     peerRef.current
       .createOffer()
       .then((offer) => {
@@ -95,6 +108,7 @@ const Room = () => {
   }
 
   function handleRecieveCall(incoming) {
+    console.log("handleRecieveCall", incoming);
     peerRef.current = createPeer();
     const desc = new RTCSessionDescription(incoming.sdp);
     peerRef.current
@@ -123,11 +137,13 @@ const Room = () => {
   }
 
   function handleAnswer(message) {
+    console.log("handleAnswer", message);
     const desc = new RTCSessionDescription(message.sdp);
     peerRef.current.setRemoteDescription(desc).catch((e) => console.log(e));
   }
 
   function handleICECandidateEvent(e) {
+    console.log("handleICECandidateEvent", handleICECandidateEvent);
     if (e.candidate) {
       const payload = {
         target: otherUser.current,
@@ -138,13 +154,25 @@ const Room = () => {
   }
 
   function handleNewICECandidateMsg(incoming) {
+    console.log("handleNewICECandidateMsg", incoming);
     const candidate = new RTCIceCandidate(incoming);
 
     peerRef.current.addIceCandidate(candidate).catch((e) => console.log(e));
   }
 
   function handleTrackEvent(e) {
+    console.log("handleTrackEvent", e);
+    console.log("streams", e.streams);
     partnerVideo.current.srcObject = e.streams[0];
+  }
+
+  function getUniqueID() {
+    let pass = localStorage.getItem("uniqueID");
+    if (!pass) {
+      pass = uuid();
+      localStorage.setItem("uniqueID", pass);
+    }
+    return pass;
   }
 
   return (

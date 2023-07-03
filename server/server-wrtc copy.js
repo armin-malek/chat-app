@@ -4,6 +4,7 @@ const app = express();
 const server = http.createServer(app);
 const cors = require("cors");
 const socket = require("socket.io");
+const webrtc = require("wrtc");
 // const io = socket(server);
 
 const io = socket(server, {
@@ -19,6 +20,7 @@ const PORT = process.env.PORT || 8000;
 
 const rooms = {};
 
+let senderStream;
 io.on("connection", (socket) => {
   console.log("connection", socket.id);
   socket.on("join room", (payload) => {
@@ -47,15 +49,41 @@ io.on("connection", (socket) => {
       rooms[payload.roomID] = [{ uniqueID: payload.uniqueID, sid: socket.id }];
     }
     console.log("rooms", rooms);
-    const otherUser = rooms[payload.roomID].find(
-      (item) => item.uniqueID !== payload.uniqueID
-    );
-    console.log("otherUser", otherUser);
-    if (otherUser) {
-      socket.emit("other user", otherUser);
-      socket.to(otherUser).emit("user joined", socket.id);
-    }
+    socket.emit("start peer");
+
+    socket.on("beginPeer", async (msg) => {
+      const peer = new webrtc.RTCPeerConnection({
+        iceServers: [
+          {
+            urls: "stun:stun.stunprotocol.org",
+          },
+        ],
+      });
+      peer.ontrack = (e) => handleTrackEvent(e, peer);
+      const desc = new webrtc.RTCSessionDescription(msg.sdp);
+      await peer.setRemoteDescription(desc);
+      const answer = await peer.createAnswer();
+      await peer.setLocalDescription(answer);
+      const payload = {
+        sdp: peer.localDescription,
+      };
+
+      socket.emit("connectPeer", payload);
+      // res.json(payload);
+    });
+    // const otherUser = rooms[payload.roomID].find(
+    //   (item) => item.uniqueID !== payload.uniqueID
+    // );
+    // console.log("otherUser", otherUser);
+    // if (otherUser) {
+    //   socket.emit("other user", otherUser);
+    //   socket.to(otherUser).emit("user joined", socket.id);
+    // }
   });
+
+  function handleTrackEvent(e, peer) {
+    senderStream = e.streams[0];
+  }
 
   socket.on("disconnect", (payload) => {
     console.log("disc", payload);

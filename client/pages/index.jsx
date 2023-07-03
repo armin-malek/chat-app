@@ -10,6 +10,10 @@ export default function Home() {
     const id = uuid();
     router.push(`room/${id}`);
   }
+  function createRoomWrtc() {
+    const id = uuid();
+    router.push(`wrtc/${id}`);
+  }
 
   return (
     <>
@@ -32,6 +36,19 @@ export default function Home() {
                       style={{ paddingLeft: "5px" }}
                     />
                     ایجاد اتاق جدید
+                  </button>
+                </div>
+                <div className="row mt-2">
+                  <button
+                    className="btn btn-success"
+                    style={{ fontSize: "22px" }}
+                    onClick={() => createRoomWrtc()}
+                  >
+                    <FontAwesomeIcon
+                      icon={faPlus}
+                      style={{ paddingLeft: "5px" }}
+                    />
+                    ایجاد اتاق WRTC
                   </button>
                 </div>
                 <div className="row mt-2">

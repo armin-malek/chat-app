@@ -23,7 +23,6 @@ const Room = () => {
   }, [roomID]);
 */
   useEffect(() => {
-    if (!roomID) return;
     navigator.mediaDevices
       .getUserMedia({ audio: true, video: true })
       .then((stream) => {
@@ -31,7 +30,6 @@ const Room = () => {
         userStream.current = stream;
 
         socketRef.current = io.connect("http://localhost:8000");
-        console.log("join room", roomID);
         socketRef.current.emit("join room", roomID);
 
         socketRef.current.on("other user", (userID) => {
@@ -49,11 +47,9 @@ const Room = () => {
 
         socketRef.current.on("ice-candidate", handleNewICECandidateMsg);
       });
-  }, [roomID]);
+  }, []);
 
   function callUser(userID) {
-    console.log("callUser", userID);
-
     peerRef.current = createPeer(userID);
     userStream.current
       .getTracks()
@@ -61,12 +57,10 @@ const Room = () => {
   }
 
   function createPeer(userID) {
-    console.log("createPeer", userID);
     const peer = new RTCPeerConnection({
       iceServers: [
         {
           urls: "stun:stun.stunprotocol.org",
-          // urls: "stun:localhost:3478",
           // urls: "stun:stun.frozenmountain.com:3478",
         },
         // {
@@ -85,7 +79,6 @@ const Room = () => {
   }
 
   function handleNegotiationNeededEvent(userID) {
-    console.log("handleNegotiationNeededEvent", userID);
     peerRef.current
       .createOffer()
       .then((offer) => {
@@ -103,7 +96,6 @@ const Room = () => {
   }
 
   function handleRecieveCall(incoming) {
-    console.log("handleRecieveCall", incoming);
     peerRef.current = createPeer();
     const desc = new RTCSessionDescription(incoming.sdp);
     peerRef.current
@@ -132,13 +124,11 @@ const Room = () => {
   }
 
   function handleAnswer(message) {
-    console.log("handleAnswer", message);
     const desc = new RTCSessionDescription(message.sdp);
     peerRef.current.setRemoteDescription(desc).catch((e) => console.log(e));
   }
 
   function handleICECandidateEvent(e) {
-    console.log("handleICECandidateEvent", handleICECandidateEvent);
     if (e.candidate) {
       const payload = {
         target: otherUser.current,
@@ -149,14 +139,12 @@ const Room = () => {
   }
 
   function handleNewICECandidateMsg(incoming) {
-    console.log("handleNewICECandidateMsg", incoming);
     const candidate = new RTCIceCandidate(incoming);
 
     peerRef.current.addIceCandidate(candidate).catch((e) => console.log(e));
   }
 
   function handleTrackEvent(e) {
-    console.log("handleTrackEvent", e);
     console.log("streams", e.streams);
     partnerVideo.current.srcObject = e.streams[0];
   }

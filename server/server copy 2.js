@@ -21,35 +21,18 @@ const rooms = {};
 
 io.on("connection", (socket) => {
   console.log("connection", socket.id);
-  socket.on("join room", (payload) => {
-    console.log("payload", payload);
+  socket.on("join room", (roomID) => {
+    console.log("roomID", roomID);
 
-    if (rooms[payload.roomID]) {
+    if (rooms[roomID]) {
       console.log("push");
-      let lastSession = rooms[payload.roomID].findIndex(
-        (item) => item.uniqueID == payload.uniqueID
-      );
-      console.log("lastSession", lastSession);
-      if (lastSession >= 0) {
-        rooms[payload.roomID][lastSession] = {
-          uniqueID: payload.uniqueID,
-          sid: socket.id,
-        };
-        // rooms[payload.roomID] = [...new Set(rooms[payload.roomID].map(item => item.uniqueID))]
-      } else {
-        rooms[payload.roomID].push({
-          uniqueID: payload.uniqueID,
-          sid: socket.id,
-        });
-      }
+      rooms[roomID].push(socket.id);
     } else {
       console.log("not push");
-      rooms[payload.roomID] = [{ uniqueID: payload.uniqueID, sid: socket.id }];
+      rooms[roomID] = [socket.id];
     }
     console.log("rooms", rooms);
-    const otherUser = rooms[payload.roomID].find(
-      (item) => item.uniqueID !== payload.uniqueID
-    );
+    const otherUser = rooms[roomID].find((id) => id !== socket.id);
     console.log("otherUser", otherUser);
     if (otherUser) {
       socket.emit("other user", otherUser);
