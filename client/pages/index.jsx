@@ -14,6 +14,10 @@ export default function Home() {
     const id = uuid();
     router.push(`wrtc/${id}`);
   }
+  function createRoomSoup() {
+    const id = uuid();
+    router.push(`soup/${id}`);
+  }
 
   return (
     <>
@@ -49,6 +53,19 @@ export default function Home() {
                       style={{ paddingLeft: "5px" }}
                     />
                     ایجاد اتاق WRTC
+                  </button>
+                </div>
+                <div className="row mt-2">
+                  <button
+                    className="btn btn-success"
+                    style={{ fontSize: "22px" }}
+                    onClick={() => createRoomSoup()}
+                  >
+                    <FontAwesomeIcon
+                      icon={faPlus}
+                      style={{ paddingLeft: "5px" }}
+                    />
+                    ایجاد اتاق Soup
                   </button>
                 </div>
                 <div className="row mt-2">
