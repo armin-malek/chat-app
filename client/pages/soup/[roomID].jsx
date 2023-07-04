@@ -38,6 +38,7 @@ const Room = () => {
   let producer;
   let consumerTransport;
   let consumer;
+  let isProducer = false;
 
   const RefLocalVideo = useRef();
 
@@ -46,15 +47,18 @@ const Room = () => {
     RefSocket.current = io("http://localhost:8000/mediasoup");
     // const socket = io.connect("http://localhost:8000");
 
-    RefSocket.current.on("connection-success", async ({ socketId }) => {
-      console.log("connection-success", socketId);
-    });
+    RefSocket.current.on(
+      "connection-success",
+      async ({ socketId, existinProducer }) => {
+        console.log("connection-success", socketId, existinProducer);
+      }
+    );
     return;
   }, []);
 
   function getLocalStream() {
-    navigator.getUserMedia(
-      {
+    navigator.mediaDevices
+      .getUserMedia({
         audio: false,
         video: {
           width: {
@@ -66,24 +70,37 @@ const Room = () => {
             max: 1080,
           },
         },
-      },
-      streamSuccess,
-      (error) => {
+      })
+      .then(streamSuccess)
+      .catch((error) => {
         console.log(error.message);
-      }
-    );
+      });
   }
 
-  const streamSuccess = async (stream) => {
+  const streamSuccess = (stream) => {
     RefLocalVideo.current.srcObject = stream;
     // RefLocalVideo.current = stream;
-    console.log("stream", stream);
-    console.log(" RefLocalVideo.current", RefLocalVideo.current);
+    // console.log("stream", stream);
+    // console.log(" RefLocalVideo.current", RefLocalVideo.current);
     const track = stream.getVideoTracks()[0];
     params = {
       track,
       ...params,
     };
+    goConnect(true);
+  };
+
+  const goConnect = (producerOrConsumer) => {
+    isProducer = producerOrConsumer;
+    device === undefined ? getRtpCapabilities() : goCreateTransport();
+  };
+
+  const goConsume = () => {
+    goConnect(false);
+  };
+
+  const goCreateTransport = () => {
+    isProducer ? createSendTransport() : createRecvTransport();
   };
 
   const createDevice = async () => {
@@ -99,6 +116,8 @@ const Room = () => {
       });
 
       console.log("RTP Capabilities", device.rtpCapabilities);
+      // once the device loads, create transport
+      goCreateTransport();
     } catch (error) {
       console.log(error);
       if (error.name === "UnsupportedError")
@@ -110,12 +129,15 @@ const Room = () => {
     // make a request to the server for Router RTP Capabilities
     // see server's socket.on('getRtpCapabilities', ...)
     // the server sends back data object which contains rtpCapabilities
-    RefSocket.current.emit("getRtpCapabilities", (data) => {
+    RefSocket.current.emit("createRoom", (data) => {
       console.log(`Router RTP Capabilities... ${data.rtpCapabilities}`);
 
       // we assign to local variable and will be used when
       // loading the client Device (see createDevice above)
       rtpCapabilities = data.rtpCapabilities;
+
+      // once we have thr RtpCapabilities from the router, create Device
+      createDevice();
     });
   };
 
@@ -129,7 +151,7 @@ const Room = () => {
         // The server sends back params needed
         // to create Send Transport on the client side
         if (params.error) {
-          console.log(params.error);
+          console.log(params);
           return;
         }
 
@@ -189,6 +211,7 @@ const Room = () => {
             }
           }
         );
+        connectSendTransport();
       }
     );
   };
@@ -255,6 +278,8 @@ const Room = () => {
             }
           }
         );
+
+        connectRecvTransport();
       }
     );
   };
@@ -270,7 +295,7 @@ const Room = () => {
       },
       async ({ params }) => {
         if (params.error) {
-          console.log("Cannot Consume");
+          console.log("Cannot Consume", params);
           return;
         }
 
@@ -315,12 +340,12 @@ const Room = () => {
                     autoPlay
                     className="video"
                     ref={RefLocalVideo}
-                  />
+                  ></video>
                 </div>
               </td>
               <td>
                 <div id="sharedBtns">
-                  <video id="remoteVideo" autoPlay className="video" />
+                  <video id="remoteVideo" autoPlay className="video"></video>
                 </div>
               </td>
             </tr>
@@ -328,59 +353,14 @@ const Room = () => {
               <td>
                 <div id="sharedBtns">
                   <button id="btnLocalVideo" onClick={() => getLocalStream()}>
-                    1. Get Local Video
-                  </button>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td colSpan={2}>
-                <div id="sharedBtns">
-                  <button
-                    id="btnRtpCapabilities"
-                    onClick={() => getRtpCapabilities()}
-                  >
-                    2. Get Rtp Capabilities
-                  </button>
-                  <br />
-                  <button id="btnDevice" onClick={() => createDevice()}>
-                    3. Create Device
-                  </button>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <div id="sharedBtns">
-                  <button
-                    id="btnCreateSendTransport"
-                    onClick={() => createSendTransport()}
-                  >
-                    4. Create Send Transport
-                  </button>
-                  <br />
-                  <button
-                    id="btnConnectSendTransport"
-                    onClick={() => connectSendTransport()}
-                  >
-                    5. Connect Send Transport &amp; Produce
+                    Publish
                   </button>
                 </div>
               </td>
               <td>
                 <div id="sharedBtns">
-                  <button
-                    id="btnRecvSendTransport"
-                    onClick={() => createRecvTransport()}
-                  >
-                    6. Create Recv Transport
-                  </button>
-                  <br />
-                  <button
-                    id="btnConnectRecvTransport"
-                    onClick={() => connectRecvTransport()}
-                  >
-                    7. Connect Recv Transport &amp; Consume
+                  <button id="btnRecvSendTransport" onClick={() => goConsume()}>
+                    Consume
                   </button>
                 </div>
               </td>

@@ -1,7 +1,6 @@
 const express = require("express");
 const app = express();
 const http = require("http");
-const cors = require("cors");
 const mediasoup = require("mediasoup");
 
 // app.use(cors({ origin: ["http://localhost:3000"] }));
@@ -18,12 +17,12 @@ const PORT = process.env.PORT || 8000;
 const peers = io.of("/mediasoup");
 
 let worker = createWorker();
-let router, producerTransport, consumerTransport;
+let router, producerTransport, consumerTransport, producer, consumer;
 
 async function createWorker() {
   worker = await mediasoup.createWorker({
     rtcMinPort: 2000,
-    rtcMaxPort: 2020,
+    rtcMaxPort: 2999,
   });
   console.log(`worker pid ${worker.pid}`);
 
@@ -57,25 +56,38 @@ const mediaCodecs = [
 
 peers.on("connection", async (socket) => {
   console.log("a user connected");
-  socket.emit("connection-success", { socketId: socket.id });
+  socket.emit("connection-success", {
+    socketId: socket.id,
+    existingProducer: producer ? true : false,
+  });
 
   socket.on("disconnect", () => {
     // do some cleanup
     console.log("peer disconnected");
   });
 
-  router = await worker.createRouter({ mediaCodecs });
+  socket.on("createRoom", async (callback) => {
+    if (router === undefined) {
+      // worker.createRouter(options)
+      // options = { mediaCodecs, appData }
+      // mediaCodecs -> defined above
+      // appData -> custom application data - we are not supplying any
+      // none of the two are required
+      router = await worker.createRouter({ mediaCodecs });
 
-  // Client emits a request for RTP Capabilities
-  // This event responds to the request
-  socket.on("getRtpCapabilities", (callback) => {
+      console.log(`Router ID: ${router?.id}`);
+    }
+
+    getRtpCapabilities(callback);
+  });
+
+  const getRtpCapabilities = (callback) => {
     const rtpCapabilities = router.rtpCapabilities;
 
-    console.log("rtp Capabilities", rtpCapabilities);
-
-    // call callback from the client and send back the rtpCapabilities
     callback({ rtpCapabilities });
-  });
+  };
+
+  // router = await worker.createRouter({ mediaCodecs });
 
   socket.on("createWebRtcTransport", async ({ sender }, callback) => {
     console.log(`Is this a sender request? ${sender}`);
@@ -159,7 +171,7 @@ peers.on("connection", async (socket) => {
         callback({ params });
       }
     } catch (error) {
-      console.log(error.message);
+      console.log(error);
       callback({
         params: {
           error: error,
@@ -191,6 +203,7 @@ const createWebRtcTransport = async (callback) => {
 
     // https://mediasoup.org/documentation/v3/mediasoup/api/#router-createWebRtcTransport
     let transport = await router.createWebRtcTransport(webRtcTransport_options);
+
     console.log(`transport id: ${transport.id}`);
 
     transport.on("dtlsstatechange", (dtlsState) => {
@@ -204,6 +217,7 @@ const createWebRtcTransport = async (callback) => {
     });
 
     // send back to the client the following prameters
+
     callback({
       // https://mediasoup.org/documentation/v3/mediasoup-client/api/#TransportOptions
       params: {
